@@ -12,7 +12,7 @@ const newslettersURL = "https://toby.fangamer.com";
 const progressURL = "https://deltarune.com/7b/";
 const twitterAccounts = { "39157744": "Toby Fox", "1148644417": "UNDERTALE/DELTARUNE" };
 const bskyAccounts = { "did:plc:vshnclkqqguyg6xcz6q7g65k": "Toby Fox", "did:plc:ac4wblywohiikyarecf3ddpc": "UNDERTALE/DELTARUNE" };
-const baseState = { newsletters: [], progress: null, twitter: {}, bsky: {}, rolesMessage: null };
+const baseState = { newsletters: [], progress: null, twitter: {}, bsky: {}, rolesMessage: null, queue: [] };
 
 // essentials
 const config = JSON.parse(readFileSync("config.json", "utf8"));
@@ -126,54 +126,62 @@ client.on(Events.InteractionCreate, async interaction => {
 // twitter & bluesky
 const twitter = new Emusks();
 const bsky = new AtpAgent({ service: 'https://bsky.social' });
-const queue = [];
 let handler = null;
-const post = (content, media, socials = ["twitter", "bluesky"]) => {
-    queue.push({ content, media, socials });
-    if (!handler) handler = (async () => {
-        while (queue.length > 0) {
-            log(`Queue size: ${queue.length}`);
-            const { content, media, socials } = queue.shift();
-            const image = media ? readFileSync(media) : undefined;
-            if (socials.includes("twitter")) {
-                try {
-                    const mediaIds = [];
-                    if (media) {
-                        const twitterMedia = await twitter.media.create(image);
-                        mediaIds.push(twitterMedia.media_id);
-                    };
-                    const response = await twitter.tweets.create(content, { mediaIds });
-                    log(`Tweeted! ${response.id}`);
-                } catch (err) {
-                    log("Failed to tweet", err);
+const baseHandler = (async () => {
+    while (state.queue.length > 0) {
+        log(`Queue size: ${state.queue.length}`);
+        const { content, media, socials } = state.queue.shift();
+        const image = (media && existsSync(media)) ? readFileSync(media) : undefined;
+        let toPush = undefined;
+        if (socials.includes("twitter")) {
+            try {
+                const mediaIds = [];
+                if (media) {
+                    const twitterMedia = await twitter.media.create(image);
+                    mediaIds.push(twitterMedia.media_id);
                 };
+                const response = await twitter.tweets.create(content, { mediaIds });
+                log(`Tweeted! ${response.id}`);
+            } catch (err) {
+                log("Failed to tweet", err);
+                if (!toPush) toPush = { content, media, socials: ["twitter"] };
+                else toPush.socials.push("twitter");
             };
-            if (socials.includes("bluesky")) {
-                try {
-                    const rt = new RichText({ text: content, });
-                    await rt.detectFacets(bsky);
-                    const record = {
-                        text: rt.text,
-                        facets: rt.facets
-                    };
-                    if (media) {
-                        const upload = await bsky.uploadBlob(image, { encoding: "image/png" });
-                        record.embed = {
-                            $type: 'app.bsky.embed.images',
-                            images: [{ image: upload.data.blob, alt: "" }]
-                        };
-                    };
-                    const response = await bsky.post(record);
-                    log(`Posted to Bluesky! ${response.uri}`);
-                } catch (err) {
-                    log("Failed to post to Bluesky", err);
-                };
-            };
-            await sleep(60);
         };
-        log(`Queue empty!`);
-        handler = null;
-    })();
+        if (socials.includes("bluesky")) {
+            try {
+                const rt = new RichText({ text: content, });
+                await rt.detectFacets(bsky);
+                const record = {
+                    text: rt.text,
+                    facets: rt.facets
+                };
+                if (media) {
+                    const upload = await bsky.uploadBlob(image, { encoding: "image/png" });
+                    record.embed = {
+                        $type: 'app.bsky.embed.images',
+                        images: [{ image: upload.data.blob, alt: "" }]
+                    };
+                };
+                const response = await bsky.post(record);
+                log(`Posted to Bluesky! ${response.uri}`);
+            } catch (err) {
+                log("Failed to post to Bluesky", err);
+                if (!toPush) toPush = { content, media, socials: ["bluesky"] };
+                else toPush.socials.push("bluesky");
+            };
+        };
+        if (toPush) state.queue.push(toPush);
+        saveState();
+        await sleep(60);
+    };
+    log(`Queue empty!`);
+    handler = null;
+});
+const post = (content, media, socials = ["twitter", "bluesky"]) => {
+    state.queue.push({ content, media, socials });
+    saveState();
+    if (!handler) handler = baseHandler();
 };
 
 // scrapers
@@ -189,9 +197,9 @@ const checkNewsletters = async () => {
                 const [title, description] = $(article).text().split('\n').map(s => s.trim()).filter(Boolean);
                 log(`NEW NEWSLETTER! ${url}\n    ${title}\n    ${description}`);
                 const channel = await getChannel(config.channels.newsletters);
-                const msg = await channel.send(`# New newsletter! ✉️\n**${url}**\n-# ||<@&${config.roles.newsletters[0]}>||`);
+                const msg = await channel.send(`# ${config.firstrun ? "Last newsletter:" : "New newsletter!"}\n**${url}**\n-# ||<@&${config.roles.newsletters[0]}>||`);
                 msg.crosspost().catch(() => { });
-                post(`New Toby Fox newsletter! #deltarune\n${url}`);
+                post(`${config.firstrun ? "Last Toby Fox newsletter:" : "New Toby Fox newsletter!"} #deltarune\n${url}`);
                 state.newsletters.push(href);
                 changesMade = true;
             };
@@ -228,9 +236,9 @@ const checkProgress = async () => {
             };
             await screenshot(log);
             const channel = await getChannel(config.channels.progress);
-            const message = await channel.send({ content: `# [New 7B progress!](${progressURL})\n-# ||<@&${config.roles.progress[0]}>||`, files: ["./progress.png"] });
+            const message = await channel.send({ content: `# [${config.firstrun ? "Current 7B progress:" : "New 7B progress!"}](${progressURL})\n-# ||<@&${config.roles.progress[0]}>||`, files: ["./progress.png"] });
             message.crosspost().catch(() => { });
-            post(`New 7B progress! #deltarune\n${progressURL}`, "./progress.png");
+            post(`${config.firstrun ? "Current 7B progress:" : "New 7B progress!"} #deltarune\n${progressURL}`, "./progress.png");
             state.progress = progressSha256;
             changesMade = true;
         };
@@ -250,10 +258,10 @@ const checkTwitter = async () => {
                 if (String(tweet.user?.id) === account && Date.now() - new Date(tweet.created_at).getTime() < config.maxage * 1000 && !state.twitter[account].includes(tweet.id)) {
                     log(`NEW TWEET BY ${twitterAccounts[account]}! https://x.com/i/status/${tweet.id}`);
                     const channel = await getChannel(config.channels.twitter);
-                    const message = await channel.send(`# New Tweet by ${twitterAccounts[account]}!\n**https://x.com/i/status/${tweet.id}**\n-# ||<@&${config.roles.twitter[0]}>||`);
+                    const message = await channel.send(`# ${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}:\n**https://x.com/i/status/${tweet.id}**\n-# ||<@&${config.roles.twitter[0]}>||`);
                     message.crosspost().catch(() => { });
                     await twitter.tweets.retweet(tweet.id);
-                    post(`New tweet by ${twitterAccounts[account]}! #deltarune\nhttps://x.com/i/status/${tweet.id}`, undefined, ["bluesky"]);
+                    post(`${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}: #deltarune\nhttps://x.com/i/status/${tweet.id}`, undefined, ["bluesky"]);
                     state.twitter[account].push(tweet.id);
                     changesMade = true;
                 };
@@ -277,10 +285,10 @@ const checkBluesky = async () => {
                     const postURL = `https://bsky.app/profile/${entry.post?.author?.handle}/post/${entry.post?.uri.split('/').pop()}`;
                     log(`NEW BLUESKY POST BY ${bskyAccounts[account]}! ${postURL}`);
                     const channel = await getChannel(config.channels.bluesky);
-                    const message = await channel.send(`# New Bluesky post by ${bskyAccounts[account]}!\n**${postURL}**\n-# ||<@&${config.roles.bluesky[0]}>||`);
+                    const message = await channel.send(`# ${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}:\n**${postURL}**\n-# ||<@&${config.roles.bluesky[0]}>||`);
                     message.crosspost().catch(() => { });
                     await bsky.repost(entry.post.uri, entry.post.cid);
-                    post(`New Bluesky post by ${bskyAccounts[account]}! #deltarune\n${postURL}`, undefined, ["twitter"]);
+                    post(`${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}: #deltarune\n${postURL}`, undefined, ["twitter"]);
                     state.bsky[account].push(entry.post?.uri);
                     changesMade = true;
                 };
@@ -312,5 +320,6 @@ const check = async () => {
     await client.login(process.env.DISCORD_TOKEN);
     await twitter.login(process.env.TWITTER_AUTH);
     await bsky.login({ identifier: process.env.BSKY_HANDLE, password: process.env.BSKY_PASSWORD });
+    if (state.queue.length > 0 && !handler) handler = baseHandler();
     check();
 })();
