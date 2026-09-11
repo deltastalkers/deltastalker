@@ -9,3 +9,7 @@ npm install
 also fill out config.json and .env (instructions pending, DIY in the meantime)
 
 to run, `npm start`
+
+## to-dos
+- [ ] reddit integration (?)
+- [ ] debug commands/server 

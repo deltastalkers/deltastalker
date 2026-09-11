@@ -1,9 +1,9 @@
 import { Client, Events, GatewayIntentBits, ActivityType, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } from 'discord.js';
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from "fs";
+import { screenshot } from "./utils/screenshot.js";
 import { AtpAgent, RichText } from '@atproto/api';
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
-import puppeteer from "puppeteer";
 import Emusks from "emusks";
 import axios from "axios";
 
@@ -123,11 +123,11 @@ client.on(Events.InteractionCreate, async interaction => {
     };
 });
 
-// twitter & bluesky
+// socials
 const twitter = new Emusks();
 const bsky = new AtpAgent({ service: 'https://bsky.social' });
 let handler = null;
-const baseHandler = (async () => {
+const baseHandler = async () => {
     while (state.queue.length > 0) {
         log(`Queue size: ${state.queue.length}`);
         const { content, media, socials } = state.queue.shift();
@@ -177,7 +177,7 @@ const baseHandler = (async () => {
     };
     log(`Queue empty!`);
     handler = null;
-});
+};
 const post = (content, media, socials = ["twitter", "bluesky"]) => {
     state.queue.push({ content, media, socials });
     saveState();
@@ -216,29 +216,11 @@ const checkProgress = async () => {
         const progressSha256 = sha256sum(progressPage);
         if (progressSha256 !== state.progress) {
             log(`NEW PROGRESS!`);
-            async function screenshot(progress = () => { }) {
-                progress("launching...");
-                const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-                try {
-                    progress("opening page...");
-                    const page = await browser.newPage();
-                    progress("setting viewport...");
-                    await page.setViewport({ width: 540, height: 720 });
-                    progress("going to page...");
-                    await page.goto(progressURL, { waitUntil: 'networkidle2' });
-                    progress("taking screenshot...");
-                    await page.screenshot({ path: './progress.png', fullPage: true });
-                    progress('screenshot saved!');
-                } finally {
-                    progress("closing browser...");
-                    await browser.close();
-                };
-            };
-            await screenshot(log);
+            const screenshotPath = await screenshot(progressURL, { progress: log, width: 720, height: 720, fullPage: true });
             const channel = await getChannel(config.channels.progress);
-            const message = await channel.send({ content: `# [${config.firstrun ? "Current 7B progress:" : "New 7B progress!"}](${progressURL})\n-# ||<@&${config.roles.progress[0]}>||`, files: ["./progress.png"] });
+            const message = await channel.send({ content: `# [${config.firstrun ? "Current 7B progress:" : "New 7B progress!"}](${progressURL})\n-# ||<@&${config.roles.progress[0]}>||`, files: [screenshotPath] });
             message.crosspost().catch(() => { });
-            post(`${config.firstrun ? "Current 7B progress:" : "New 7B progress!"} #deltarune\n${progressURL}`, "./progress.png");
+            post(`${config.firstrun ? "Current 7B progress:" : "New 7B progress!"} #deltarune\n${progressURL}`, screenshotPath);
             state.progress = progressSha256;
             changesMade = true;
         };
@@ -257,11 +239,12 @@ const checkTwitter = async () => {
                 const tweet = tweets[i];
                 if (String(tweet.user?.id) === account && Date.now() - new Date(tweet.created_at).getTime() < config.maxage * 1000 && !state.twitter[account].includes(tweet.id)) {
                     log(`NEW TWEET BY ${twitterAccounts[account]}! https://x.com/i/status/${tweet.id}`);
+                    const tweetScreenshot = await screenshot(`https://x.com/i/status/${tweet.id}`, { progress: log, element: 'article[data-testid="tweet"]', cookies: [{ name: 'auth_token', value: process.env.TWITTER_AUTH, domain: '.x.com', path: '/', httpOnly: true, secure: true, sameSite: 'None' }, { name: "night_mode", value: "2", domain: ".x.com", path: "/" }] });
                     const channel = await getChannel(config.channels.twitter);
-                    const message = await channel.send(`# ${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}:\n**https://x.com/i/status/${tweet.id}**\n-# ||<@&${config.roles.twitter[0]}>||`);
+                    const message = await channel.send({ content: `# ${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}:\n**<https://x.com/i/status/${tweet.id}>**\n-# ||<@&${config.roles.twitter[0]}>||`, files: [tweetScreenshot] });
                     message.crosspost().catch(() => { });
+                    post(`${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}: #deltarune\nhttps://x.com/i/status/${tweet.id}`, tweetScreenshot, ["bluesky"]);
                     await twitter.tweets.retweet(tweet.id);
-                    post(`${config.firstrun ? "Last" : "New"} tweet by ${twitterAccounts[account]}: #deltarune\nhttps://x.com/i/status/${tweet.id}`, undefined, ["bluesky"]);
                     state.twitter[account].push(tweet.id);
                     changesMade = true;
                 };
@@ -284,11 +267,17 @@ const checkBluesky = async () => {
                 if (entry.post?.author?.did === account && Date.now() - new Date(entry.post?.indexedAt).getTime() < config.maxage * 1000 && !state.bsky[account].includes(entry.post?.uri)) {
                     const postURL = `https://bsky.app/profile/${entry.post?.author?.handle}/post/${entry.post?.uri.split('/').pop()}`;
                     log(`NEW BLUESKY POST BY ${bskyAccounts[account]}! ${postURL}`);
+                    const postScreenshot = await screenshot(postURL, {
+                        progress: log, element: `[data-testid="postThreadItem-by-${entry.post?.author?.handle}"]`, evalme: async page => {
+                            await page.goto('https://bsky.app');
+                            await page.evaluate((ACCOUNT) => localStorage.setItem('BSKY_STORAGE', JSON.stringify({ colorMode: "dark", darkTheme: "dark", session: { accounts: [ACCOUNT], currentAccount: ACCOUNT }, reminders: {}, languagePrefs: { primaryLanguage: "en", contentLanguages: ["en"], postLanguage: "en", postLanguageHistory: ["en"], appLanguage: "en" }, requireAltTextEnabled: false, largeAltBadgeEnabled: false, externalEmbeds: {}, mutedThreads: [], invites: { copiedInvites: [] }, onboarding: { step: "Home" }, hiddenPosts: [], pdsAddressHistory: [], disableHaptics: false, disableAutoplay: false, kawaii: false, hasCheckedForStarterPack: true, subtitlesEnabled: true, trendingDisabled: false, trendingVideoDisabled: false })), { service: "https://bsky.social/", signupQueued: false, pdsUrl: "https://fibercap.us-west.host.bsky.network/", isSelfHosted: false, ...bsky.session });
+                        }
+                    });
                     const channel = await getChannel(config.channels.bluesky);
-                    const message = await channel.send(`# ${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}:\n**${postURL}**\n-# ||<@&${config.roles.bluesky[0]}>||`);
+                    const message = await channel.send({ content: `# ${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}:\n**<${postURL}>**\n-# ||<@&${config.roles.bluesky[0]}>||`, files: [postScreenshot] });
                     message.crosspost().catch(() => { });
+                    post(`${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}: #deltarune\n${postURL}`, postScreenshot, ["twitter"]);
                     await bsky.repost(entry.post.uri, entry.post.cid);
-                    post(`${config.firstrun ? "Last" : "New"} Bluesky post by ${bskyAccounts[account]}: #deltarune\n${postURL}`, undefined, ["twitter"]);
                     state.bsky[account].push(entry.post?.uri);
                     changesMade = true;
                 };
