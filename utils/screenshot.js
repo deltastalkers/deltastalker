@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer-extra';
 import { mkdirSync } from "node:fs";
 puppeteer.use(StealthPlugin());
 
-export async function screenshot(url, { progress = () => { }, width = 1920, height = 1080, fullPage = false, element, cookies, evalme }) {
+export async function screenshot(url, { filename = `${randomUUID()}`, width = 1920, height = 1080, fullPage = false, element, cookies, evalme, progress = () => { } }) {
     mkdirSync("./screenshots/", { recursive: true })
     progress("launching...");
     const browser = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'] });
@@ -22,21 +22,21 @@ export async function screenshot(url, { progress = () => { }, width = 1920, heig
             progress("running eval...");
             await evalme(page);
         };
-        progress("going to page...")
+        progress(`going to URL (${url})...`);
         await page.goto(url, { waitUntil: 'domcontentloaded' });
         if (element) {
             progress("waiting for element to load...");
             const el = await page.waitForSelector(element);
             if (!fullPage) {
                 progress("taking screenshot of element...");
-                const path = `./screenshots/${randomUUID()}.png`;
+                const path = `./screenshots/${filename}.png`;
                 await el.screenshot({ path });
                 progress(`screenshot saved! ${path}`);
                 return path;
             };
         };
         progress("taking screenshot...");
-        const path = `./screenshots/${randomUUID()}.png`;
+        const path = `./screenshots/${filename}.png`;
         await page.screenshot({ path, fullPage });
         progress(`screenshot saved! ${path}`);
         return path;

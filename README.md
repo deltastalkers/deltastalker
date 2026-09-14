@@ -12,4 +12,4 @@ to run, `npm start`
 
 ## to-dos
 - [ ] reddit integration (?)
-- [ ] debug commands/server 
+- [x] debug server 
