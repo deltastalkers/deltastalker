@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, readdirSync } 
 import { screenshot } from "./utils/screenshot.js";
 import { AtpAgent, RichText } from '@atproto/api';
 import { createHash } from "node:crypto";
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import * as cheerio from "cheerio";
 import express from "express";
 import Emusks from "emusks";
@@ -14,6 +16,7 @@ const progressURL = "https://deltarune.com/7b/";
 const twitterAccounts = { "39157744": "Toby Fox", "1148644417": "UNDERTALE/DELTARUNE" };
 const bskyAccounts = { "did:plc:vshnclkqqguyg6xcz6q7g65k": "Toby Fox", "did:plc:ac4wblywohiikyarecf3ddpc": "UNDERTALE/DELTARUNE" };
 const baseState = { newsletters: [], progress: null, twitter: {}, bsky: {}, rolesMessage: null, queue: [] };
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // essentials
 const config = JSON.parse(readFileSync("config.json", "utf8"));
@@ -325,10 +328,11 @@ const check = async () => {
 };
 
 const app = express();
+app.use(express.static("public"));
 app.use("/screenshots", express.static("screenshots"));
 app.get("/state", (_, res) => res.json({ config, state, session }));
-app.get("/logs", (_, res) => res.sendFile("logs.log"));
-app.get("/errors", (_, res) => res.sendFile("errors.log"));
+app.get("/logs", (_, res) => res.sendFile(join(__dirname, "logs.log")));
+app.get("/errors", (_, res) => res.sendFile(join(__dirname, "errors.log")));
 app.get("/screenshots", (_, res) => res.json(readdirSync("./screenshots/")));
 
 (async () => {
