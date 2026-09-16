@@ -1,0 +1,90 @@
+body {
+    background-color: black;
+    color: white;
+    font-family: Arial;
+    text-align: center;
+    margin: 1em;
+}
+
+a {
+    color: white;
+}
+
+
+.main {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 1em;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    background-color: rgb(25, 25, 32);
+    border: 1px solid rgba(223, 223, 230, 0.5);
+    color: rgb(223, 223, 230);
+    padding: 1em;
+    border-radius: 1em;
+}
+
+.logs {
+    text-align: start;
+    font-family: monospace;
+    user-select: none;
+    grid-column: span 2 / span 2;
+}
+
+#logs {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 0.25em;
+    max-height: 80vh;
+    width: 100%;
+}
+
+.log {
+    padding: 0.25em;
+    border-radius: 0.25em;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.25em;
+}
+
+.log:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+}
+
+.timestamp {
+    color: hsl(120, 44%, 40%);
+    flex-shrink: 0;
+    width: max-content;
+}
+
+.data {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.error {
+    color: hsl(0, 88%, 55%);
+}
+
+.other {
+    grid-row-start: 2;
+}
+
+code {
+    font-family: monospace;
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    white-space: pre-wrap;
+    text-align: left;
+}

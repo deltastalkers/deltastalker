@@ -11,5 +11,7 @@ also fill out config.json and .env (instructions pending, DIY in the meantime)
 to run, `npm start`
 
 ## to-dos
+- [ ] improve frontend for better UX
+- [ ] modularize checks
 - [ ] reddit integration (?)
-- [x] debug server 
+- [x] debug server
