@@ -1,6 +1,6 @@
 {
   "name": "deltastalker",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "license": "AGPL-3.0-only",
   "author": {
     "name": "luluontheweb",
@@ -13,14 +13,14 @@
     "start": "node --env-file=.env ."
   },
   "dependencies": {
-    "@atproto/api": "^0.20.38",
-    "axios": "^1.19.0",
+    "@atproto/api": "^0.20.44",
+    "axios": "^1.20.0",
     "cheerio": "^1.2.0",
     "deep-object-diff": "^1.1.9",
     "discord.js": "^14.27.0",
-    "emusks": "^2.3.7",
+    "emusks": "^2.3.9",
     "express": "^5.2.1",
-    "puppeteer": "^25.5.0",
+    "puppeteer": "^25.11.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "socket.io": "^4.8.3"

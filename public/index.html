@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>deltastalker</title>
+    <title>deltastalker internals</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.12.0/highlight.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="index.css">
 </head>
@@ -12,16 +13,39 @@
 <body>
     <div class="main">
         <div class="container logs">
-            <div id="logs"></div>
-            <span id="now"></span>
+            <div id="logs" class="hljs"></div>
+            <div class="space">
+                <span id="now" class="translucent"></span>
+                <div class="buttons">
+                    <button id="filter" class="blue hoverable">filter</button>
+                    <button id="bottom" class="green hoverable">go to bottom</button>
+                    <button id="clear" class="delete hoverable">clear logs</button>
+                </div>
+            </div>
         </div>
-        <div class="container other">
-            <b>State:</b>
-            <code id="state"></code>
+        <div class="group">
+            <div class="container other">
+                <label>Session:</label>
+                <pre id="session" class="hljs language-json"></pre>
+            </div>
+            <div class="container other">
+                <label>State:</label>
+                <pre id="state" class="hljs language-json"></pre>
+            </div>
+            <div class="container other">
+                <label>Configuration:</label>
+                <pre id="config" class="hljs language-json"></pre>
+            </div>
         </div>
-        <div class="container other">
-            <b>Session:</b>
-            <code id="session"></code>
+    </div>
+    <div class="categories modal-backdrop" style="display: none;">
+        <div class="container categories-modal">
+            <div class="modal-header">
+                <label>Filter:</label>
+                <button id="close-filter" class="delete hoverable">X</button>
+            </div>
+            <div id="categories"></div>
+            <span id="display-count" class="translucent"></span>
         </div>
     </div>
     <script src="index.js"></script>

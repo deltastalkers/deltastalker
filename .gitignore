@@ -4,5 +4,6 @@ screenshots/
 config.json
 state.json
 .test/
+logs/
 *.log
 .env

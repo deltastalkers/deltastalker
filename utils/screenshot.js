@@ -4,7 +4,7 @@ import puppeteer from 'puppeteer-extra';
 import { mkdirSync } from "node:fs";
 puppeteer.use(StealthPlugin());
 
-export async function screenshot(url, { filename = `${randomUUID()}`, width = 1920, height = 1080, fullPage = false, timeout, element, cookies, evalme, progress = () => { } }) {
+export default async function screenshot(url, { filename = `${randomUUID()}`, width = 1920, height = 1080, fullPage = false, timeout, element, cookies, evalme, progress = (data, error) => { } }) {
     mkdirSync("./screenshots/", { recursive: true })
     progress("launching...");
     const browser = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'] });
@@ -30,13 +30,17 @@ export async function screenshot(url, { filename = `${randomUUID()}`, width = 19
         };
         if (element) {
             progress("waiting for element to load...");
-            const el = await page.waitForSelector(element);
-            if (!fullPage) {
-                progress("taking screenshot of element...");
-                const path = `./screenshots/${filename}.png`;
-                await el.screenshot({ path });
-                progress(`screenshot saved! ${path}`);
-                return path;
+            try {
+                const el = await page.waitForSelector(element);
+                if (!fullPage) {
+                    progress("taking screenshot of element...");
+                    const path = `./screenshots/${filename}.png`;
+                    await el.screenshot({ path });
+                    progress(`screenshot saved! ${path}`);
+                    return path;
+                };
+            } catch (e) {
+                progress("error waiting for element, taking full page screenshot instead", e);
             };
         };
         progress("taking screenshot...");
