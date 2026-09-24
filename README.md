@@ -12,7 +12,7 @@ to run, use `npm start`
 
 ## schemas
 ### `config.json`
-```json
+```jsonc
 {
   "roles": { // discord role ID, emoji for button, description for message
     "newsletters": [ "Snowflake", "✉️", "string" ],
